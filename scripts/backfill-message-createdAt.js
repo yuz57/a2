@@ -10,8 +10,10 @@
 const admin = require('firebase-admin');
 
 const DRY_RUN = process.argv.includes('--dry-run');
+// --dry-run 指定時は更新を行わず、対象判定とログ出力のみ実施する。
 
 if (!admin.apps.length) {
+  // Firebase Admin SDK の多重初期化を防ぐため、未初期化時のみ initialize する。
   admin.initializeApp();
 }
 
@@ -23,16 +25,18 @@ function isValidTimestamp(value) {
 }
 
 function candidateFromDeletedAt(data) {
+  // deletedAt が Timestamp として有効な場合のみ補完候補に採用する。
   if (!isValidTimestamp(data.deletedAt)) {
     return null;
   }
 
-  // Keep ordering sane by nudging one millisecond before deletedAt when possible.
+  // 並び順維持のため、可能なら deletedAt より 1ms 前の時刻を createdAt 候補として使う。
   const deletedMs = data.deletedAt.toMillis();
   return Timestamp.fromMillis(Math.max(0, deletedMs - 1));
 }
 
 function candidateFromMetadata(snapshot) {
+  // メタデータ由来の近似作成時刻として、createTime -> updateTime -> readTime の順で代替値を探す。
   const createTime = snapshot.createTime;
   if (isValidTimestamp(createTime)) {
     return createTime;
@@ -61,6 +65,7 @@ async function run() {
   let targets = 0;
   let updated = 0;
 
+  // 全 room を走査し、各 message の createdAt を検証して補完対象を処理するバッチ。
   for (const roomDoc of roomDocs.docs) {
     const roomId = roomDoc.id;
     const messagesRef = db.collection('rooms').doc(roomId).collection('messages');
@@ -71,6 +76,7 @@ async function run() {
       const messageId = messageDoc.id;
       const data = messageDoc.data() || {};
 
+      // 既に正常な createdAt を持つメッセージは補完不要なのでスキップする。
       if (isValidTimestamp(data.createdAt)) {
         continue;
       }
@@ -80,6 +86,7 @@ async function run() {
       const fromDeletedAt = candidateFromDeletedAt(data);
       const fromMeta = candidateFromMetadata(messageDoc);
 
+      // 補完値は deletedAt を最優先し、なければメタデータ、最後に serverTimestamp を使う。
       let patchValue;
       let source;
       if (fromDeletedAt) {
@@ -95,6 +102,7 @@ async function run() {
 
       console.log(`[target] roomId=${roomId} messageId=${messageId} source=${source}`);
 
+      // dry-run 時は書き込みを行わず、実行時のみ createdAt を更新する。
       if (!DRY_RUN) {
         await messageDoc.ref.update({ createdAt: patchValue });
         updated += 1;
