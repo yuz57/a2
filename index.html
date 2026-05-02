@@ -1,0 +1,40 @@
+diff --git a/index.html b/index.html
+index 0871e0c73aba3fa98ed3f50454de5a0346ab269c..4352edfa2230e06170e119def1bdd707b4f807f6 100644
+--- a/index.html
++++ b/index.html
+@@ -1,127 +1,36 @@
+ <!doctype html>
+ <html lang="ja">
+ <head>
+   <meta charset="UTF-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>招待制チャット</title>
+   <link rel="stylesheet" href="./css/chat.css" />
+ </head>
+ <body>
+   <main class="app">
+     <header class="header">
+       <div>
+         <div class="title" id="roomTitle">招待制チャットルーム</div>
+         <div class="sub" id="roomSub"></div>
+       </div>
+       <div class="actions">
+         <button class="btn" id="copyInviteBtn">招待URLをコピー</button>
+       </div>
+     </header>
+ 
+     <section class="username-bar">
+       <label for="username">ユーザーネーム</label>
+       <input id="username" type="text" maxlength="20" placeholder="例: taro" value="you" />
+     </section>
+ 
+     <section class="messages" id="messages"></section>
+ 
+     <form class="composer" id="composer">
+       <textarea id="text" rows="1" placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）" maxlength="500"></textarea>
+       <button type="submit">送信</button>
+     </form>
+   </main>
+   <script type="module" src="./js/chat.js"></script>
+ </body>
+ </html>
