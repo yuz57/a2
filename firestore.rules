@@ -1,39 +1,82 @@
+// ルールのバージョン指定（v2を使用）
 rules_version = '2';
+
+// Firestoreサービス全体のルール定義
 service cloud.firestore {
+
+  // データベース配下すべてのドキュメントに適用
   match /databases/{database}/documents {
+
+    // ログイン済みかどうかを判定する関数
     function signedIn() {
       return request.auth != null;
     }
 
+    // 指定されたルームのメンバーかどうかを判定する関数
     function isRoomMember(roomId) {
+      // ログインしていて、membersコレクションに自分のUIDが存在するか
       return signedIn() &&
         exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid));
     }
 
+    // メッセージ作成時のデータが正しいか検証する関数
     function isMessageCreateValid() {
+
+      // 必須フィールド（text, authorId, authorName, createdAt）がすべて含まれているか
       return request.resource.data.keys().hasAll(['text', 'authorId', 'authorName', 'createdAt']) &&
+
+        // authorIdが現在ログインしているユーザーのUIDと一致しているか（なりすまし防止）
         request.resource.data.authorId == request.auth.uid &&
+
+        // textフィールドが文字列型であることを確認
         request.resource.data.text is string &&
+
+        // authorNameフィールドが文字列型であることを確認
         request.resource.data.authorName is string &&
+
+        // createdAtがサーバー時刻と一致するか、もしくはtimestamp型であることを確認
         (request.resource.data.createdAt == request.time || request.resource.data.createdAt is timestamp);
     }
 
+    // roomsコレクションのルール
     match /rooms/{roomId} {
+
+      // ルームはメンバーのみ読み取り可能
       allow read: if isRoomMember(roomId);
+
+      // ルーム作成はログイン済みかつ自分を作成者にする場合のみ許可
       allow create: if signedIn() &&
         request.resource.data.createdBy == request.auth.uid;
+
+      // ルームの更新・削除は作成者本人のみ許可
       allow update, delete: if signedIn() && resource.data.createdBy == request.auth.uid;
 
+      // membersサブコレクションのルール
       match /members/{uid} {
+
+        // メンバー一覧はルームメンバーのみ閲覧可能
         allow read: if isRoomMember(roomId);
+
+        // 自分自身のメンバー情報のみ作成・更新可能
         allow create, update: if signedIn() && uid == request.auth.uid;
+
+        // メンバー削除は禁止
         allow delete: if false;
       }
 
+      // messagesサブコレクションのルール
       match /messages/{messageId} {
+
+        // メッセージはルームメンバーのみ閲覧可能
         allow read: if isRoomMember(roomId);
+
+        // メッセージ投稿はメンバーかつデータが正しい場合のみ許可
         allow create: if isRoomMember(roomId) && isMessageCreateValid();
+
+        // メッセージの更新は禁止（編集不可）
         allow update: if false;
+
+        // メッセージ削除は投稿者本人のみ許可
         allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
       }
     }
